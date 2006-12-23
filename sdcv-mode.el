@@ -42,27 +42,28 @@
 When provided with a prefix argument, use all the dictionaries
 no matter what `sdcv-dictionary-list' is."
   (interactive "P")
-  (let ((word (if mark-active
+  (let ((word (if (and transient-mark-mode mark-active)
 		  (buffer-substring-no-properties (region-beginning) (region-end))
-		  (current-word nil t))))
+		  (current-word nil t)))
+	;; note that elisp is dynamic-scoped
+	(sdcv-dictionary-list (if force-all-dictionaries
+				  nil
+				  sdcv-dictionary-list)))
     (setq word (read-string (format "Search the dictionary for (default %s): " word)
 			    nil nil word))
-    (sdcv-search-word word force-all-dictionaries)))
+    (sdcv-search-word word)))
 
-(defun sdcv-search-word (word &optional force-all-dictionaries)
+(defun sdcv-search-word (word)
   "Search WORD through the command-line tool sdcv.
 The result will be displayed in buffer named with
-`sdcv-buffer-name' with `sdcv-mode'.
-If FORCE-ALL-DICTIONARIES is non-nil, use all
-dictionaries no matter what `sdcv-dictionary-list'
-is."
+`sdcv-buffer-name' with `sdcv-mode'."
   (set-buffer (get-buffer-create sdcv-buffer-name))
   (setq buffer-read-only nil)
   (erase-buffer)
   (let ((process (start-process-shell-command "sdcv"
 					      sdcv-buffer-name
 					      "sdcv"
-					      (sdcv-generate-dictionary-argument force-all-dictionaries)
+					      (sdcv-generate-dictionary-argument)
 					      "-n"
 					      (shell-quote-argument word))))
     (set-process-sentinel
@@ -72,10 +73,9 @@ is."
 	 (unless (eq (current-buffer) (sdcv-get-buffer))
 	   (sdcv-goto-sdcv))
 	 (sdcv-mode-reinit))))))
-(defun sdcv-generate-dictionary-argument (&optional force-all)
-  "Generate dictionary argument for sdcv from `sdcv-dictionary-list'.
-If FORCE-ALL is non-nil, use all the dictionaries."
-  (if (or force-all (null sdcv-dictionary-list))
+(defun sdcv-generate-dictionary-argument ()
+  "Generate dictionary argument for sdcv from `sdcv-dictionary-list'."
+  (if (null sdcv-dictionary-list)
       ""
       (apply 'concat
 	     (mapcar (lambda (dict)
