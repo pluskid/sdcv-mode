@@ -34,7 +34,8 @@
 
 (provide 'sdcv-mode)
 (eval-when-compile
-  (require 'cl))
+  (require 'cl)
+  (require 'outline))
 
 ;;; ==================================================================
 ;;; Frontend, search word and display sdcv buffer
@@ -46,7 +47,7 @@ no matter what `sdcv-dictionary-list' is."
   (let ((word (if (and transient-mark-mode mark-active)
 		  (buffer-substring-no-properties (region-beginning)
 						  (region-end))
-		(current-word nil t)))
+		(sdcv-current-word)))
 	;; note that elisp is dynamic-scoped
 	(sdcv-dictionary-list (if force-all-dictionaries
 				  nil
@@ -90,6 +91,20 @@ The result will be displayed in buffer named with
 
 ;;; ==================================================================
 ;;; utilities to switch from and to sdcv buffer
+(defun sdcv-current-word ()
+  "Get the current word under the cursor."
+  (if (or (< emacs-major-version 21)
+	  (and (= emacs-major-version 21)
+	       (< emacs-minor-version 4)))
+      (sdcv-current-word-1)
+    ;; We have a powerful `current-word' function since 21.4
+    (current-word nil t)))
+(defun sdcv-current-word-1 ()
+  (save-excursion
+    (backward-word 1)
+    (mark-word 1)
+    (buffer-substring-no-properties (region-beginning)
+				    (region-end))))
 (defvar sdcv-previous-window-conf nil
   "Window configuration before switching to sdcv buffer.")
 (defun sdcv-goto-sdcv ()
@@ -114,10 +129,8 @@ The result will be displayed in buffer named with
 (defun sdcv-get-buffer ()
   "Get the sdcv buffer. Create one if there's none."
   (let ((buffer (get-buffer-create sdcv-buffer-name)))
-    (unless (eq (buffer-local-value 'major-mode buffer)
-		'sdcv-mode)
-      (save-excursion
-	(set-buffer buffer)
+    (with-current-buffer buffer
+      (unless (eq major-mode 'sdcv-mode)
 	(sdcv-mode)))
     buffer))
 
@@ -190,7 +203,7 @@ the beginning of the buffer."
   (ignore-errors
     (next-line 1)
     (save-excursion
-      (move-beginning-of-line nil)
+      (beginning-of-line nil)
       (when (looking-at outline-regexp)
 	(show-entry)))))
 ;; I decide not to fold the definition entry when
