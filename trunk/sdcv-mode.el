@@ -179,6 +179,7 @@ The result will be displayed in buffer named with
 Turning on Text mode runs the normal hook `sdcv-mode-hook'."
   (setq font-lock-defaults '(sdcv-mode-font-lock-keywords))
   (setq buffer-read-only t)
+  (outline-mode)
   (setq outline-regexp "^-->.*\n-->"))
 
 (defun sdcv-mode-reinit ()
@@ -188,7 +189,7 @@ the beginning of the buffer."
   (ignore-errors
     (setq buffer-read-only t)
     (hide-body)
-    (beginning-of-buffer)
+    (goto-char (point-min))
     (next-line 1)
     (show-entry)))
 
