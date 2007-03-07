@@ -32,10 +32,10 @@
 
 ;;; Code:
 
+(require 'outline)
 (provide 'sdcv-mode)
 (eval-when-compile
-  (require 'cl)
-  (require 'outline))
+  (require 'cl))
 
 ;;; ==================================================================
 ;;; Frontend, search word and display sdcv buffer
@@ -179,7 +179,6 @@ The result will be displayed in buffer named with
 Turning on Text mode runs the normal hook `sdcv-mode-hook'."
   (setq font-lock-defaults '(sdcv-mode-font-lock-keywords))
   (setq buffer-read-only t)
-  (outline-mode)
   (setq outline-regexp "^-->.*\n-->"))
 
 (defun sdcv-mode-reinit ()
