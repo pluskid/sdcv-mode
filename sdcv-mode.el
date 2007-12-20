@@ -2,7 +2,7 @@
 
 ;; Copyright 2006 pluskid
 ;;
-;; Author: pluskid.zju@gmail.com
+;; Author: pluskid@gmail.com
 ;; Version: $Id: sdcv-mode.el,v 0.0 2006/12/21 11:20:51 kid Exp $
 ;; Keywords: sdcv dictionary
 ;; X-URL: not distributed yet
@@ -45,17 +45,17 @@ When provided with a prefix argument, use all the dictionaries
 no matter what `sdcv-dictionary-list' is."
   (interactive "P")
   (let ((word (if (and transient-mark-mode mark-active)
-		  (buffer-substring-no-properties (region-beginning)
-						  (region-end))
-		(sdcv-current-word)))
-	;; note that elisp is dynamic-scoped
-	(sdcv-dictionary-list (if force-all-dictionaries
-				  nil
-				sdcv-dictionary-list)))
+                  (buffer-substring-no-properties (region-beginning)
+                                                  (region-end))
+                (sdcv-current-word)))
+        ;; note that elisp is dynamic-scoped
+        (sdcv-dictionary-list (if force-all-dictionaries
+                                  nil
+                                sdcv-dictionary-list)))
     (setq word (read-string
-		(format "Search the dictionary for (default %s): "
-			word)
-		nil nil word))
+                (format "Search the dictionary for (default %s): "
+                        word)
+                nil nil word))
     (sdcv-search-word word)))
 
 (defun sdcv-search-word (word)
@@ -65,37 +65,37 @@ The result will be displayed in buffer named with
   (with-current-buffer (get-buffer-create sdcv-buffer-name)
     (setq buffer-read-only nil)
     (erase-buffer)
-    (let ((process (start-process-shell-command
-		    "sdcv"
-		    sdcv-buffer-name
-		    "sdcv"
-		    (sdcv-generate-dictionary-argument)
-		    "-n"
-		    (shell-quote-argument word))))
+    (let ((process (start-process
+                    "sdcv"
+                    sdcv-buffer-name
+                    "sdcv"
+                    (sdcv-generate-dictionary-argument)
+                    "-n"
+                    (shell-quote-argument word))))
       (set-process-sentinel
        process
        (lambda (process signal)
-	 (when (memq (process-status process) '(exit signal))
-	   (unless (eq (current-buffer) (sdcv-get-buffer))
-	     (sdcv-goto-sdcv))
-	   (sdcv-mode-reinit)))))))
+         (when (memq (process-status process) '(exit signal))
+           (unless (eq (current-buffer) (sdcv-get-buffer))
+             (sdcv-goto-sdcv))
+           (sdcv-mode-reinit)))))))
 (defun sdcv-generate-dictionary-argument ()
   "Generate dictionary argument for sdcv from `sdcv-dictionary-list'."
   (if (null sdcv-dictionary-list)
       ""
     (mapconcat (lambda (dict)
-		 (concat "-u "
-			 (shell-quote-argument dict)))
-	       sdcv-dictionary-list
-	       " ")))
+                 (concat "-u "
+                         (shell-quote-argument dict)))
+               sdcv-dictionary-list
+               " ")))
 
 ;;; ==================================================================
 ;;; utilities to switch from and to sdcv buffer
 (defun sdcv-current-word ()
   "Get the current word under the cursor."
   (if (or (< emacs-major-version 21)
-	  (and (= emacs-major-version 21)
-	       (< emacs-minor-version 4)))
+          (and (= emacs-major-version 21)
+               (< emacs-minor-version 4)))
       (sdcv-current-word-1)
     ;; We have a powerful `current-word' function since 21.4
     (current-word nil t)))
@@ -104,7 +104,7 @@ The result will be displayed in buffer named with
     (backward-word 1)
     (mark-word 1)
     (buffer-substring-no-properties (region-beginning)
-				    (region-end))))
+                                    (region-end))))
 (defvar sdcv-previous-window-conf nil
   "Window configuration before switching to sdcv buffer.")
 (defun sdcv-goto-sdcv ()
@@ -112,18 +112,18 @@ The result will be displayed in buffer named with
   (interactive)
   (setq sdcv-previous-window-conf (current-window-configuration))
   (let* ((buffer (sdcv-get-buffer))
-	 (window (get-buffer-window buffer)))
+         (window (get-buffer-window buffer)))
     (if (null window)
-	(switch-to-buffer-other-window buffer)
+        (switch-to-buffer-other-window buffer)
       (select-window window))))
 (defun sdcv-return-from-sdcv ()
   "Bury sdcv buffer and restore the previous window configuration."
   (interactive)
   (if (window-configuration-p sdcv-previous-window-conf)
       (progn
-	(set-window-configuration sdcv-previous-window-conf)
-	(setq sdcv-previous-window-conf nil)
-	(bury-buffer (sdcv-get-buffer)))
+        (set-window-configuration sdcv-previous-window-conf)
+        (setq sdcv-previous-window-conf nil)
+        (bury-buffer (sdcv-get-buffer)))
     (bury-buffer)))
 
 (defun sdcv-get-buffer ()
@@ -131,7 +131,7 @@ The result will be displayed in buffer named with
   (let ((buffer (get-buffer-create sdcv-buffer-name)))
     (with-current-buffer buffer
       (unless (eq major-mode 'sdcv-mode)
-	(sdcv-mode)))
+        (sdcv-mode)))
     buffer))
 
 ;;; ==================================================================
@@ -205,7 +205,7 @@ the beginning of the buffer."
     (save-excursion
       (beginning-of-line nil)
       (when (looking-at outline-regexp)
-	(show-entry)))))
+        (show-entry)))))
 ;; I decide not to fold the definition entry when
 ;; doing previous-line. So `sdcv-mode-previous-line'
 ;; is only an alias of `previous-line'.
