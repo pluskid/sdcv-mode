@@ -65,20 +65,9 @@ The result will be displayed in buffer named with
   (with-current-buffer (get-buffer-create sdcv-buffer-name)
     (setq buffer-read-only nil)
     (erase-buffer)
-    (let ((process (start-process
-                    "sdcv"
-                    sdcv-buffer-name
-                    "sdcv"
-                    (sdcv-generate-dictionary-argument)
-                    "-n"
-                    (shell-quote-argument word))))
-      (set-process-sentinel
-       process
-       (lambda (process signal)
-         (when (memq (process-status process) '(exit signal))
-           (unless (eq (current-buffer) (sdcv-get-buffer))
-             (sdcv-goto-sdcv))
-           (sdcv-mode-reinit)))))))
+    (insert (sdcv-do-lookup word)))
+  (sdcv-goto-sdcv)
+  (sdcv-mode-reinit))
 (defun sdcv-generate-dictionary-argument ()
   "Generate dictionary argument for sdcv from `sdcv-dictionary-list'."
   (if (null sdcv-dictionary-list)
@@ -110,7 +99,9 @@ The result will be displayed in buffer named with
 (defun sdcv-goto-sdcv ()
   "Switch to sdcv buffer in other window."
   (interactive)
-  (setq sdcv-previous-window-conf (current-window-configuration))
+  (unless (eq (current-buffer)
+	      (sdcv-get-buffer))
+    (setq sdcv-previous-window-conf (current-window-configuration)))
   (let* ((buffer (sdcv-get-buffer))
          (window (get-buffer-window buffer)))
     (if (null window)
@@ -210,6 +201,62 @@ the beginning of the buffer."
 ;; doing previous-line. So `sdcv-mode-previous-line'
 ;; is only an alias of `previous-line'.
 (defalias 'sdcv-mode-previous-line 'previous-line)
+
+
+;;; ==================================================================
+;;; Support for sdcv process in background
+(defun sdcv-do-lookup (word)
+  "Send the word to the sdcv process and return the result."
+  (let ((process (sdcv-get-process)))
+    (process-send-string process (concat word "\n"))
+    (with-current-buffer (process-buffer process)
+      (let (rlt done)
+	(while (not done)
+	  (when (string-equal "Enter word or phrase: "
+			      (sdcv-buffer-tail 22))
+	    (setq rlt (buffer-substring-no-properties (point-min)
+						      (- (point-max) 22)))
+	    (setq done t))
+	  (when (string-equal "Your choice[-1 to abort]: "
+			      (sdcv-buffer-tail 26))
+	    (message "bingo")
+	    (delete-region (- (point-max) 26)
+			   (point-max))
+	    (process-send-string process "-1\n"))
+	  (unless done
+	    (sleep-for 0.01)))
+	(erase-buffer)
+	rlt))))
+
+(defconst sdcv-process-name "%sdcv-mode-process%")
+(defconst sdcv-process-buffer-name "*sdcv-mode-process*")
+
+(defun sdcv-get-process ()
+  "Get or create the sdcv process."
+  (let ((process (get-process sdcv-process-name)))
+    (when (null process)
+      (setq process (start-process sdcv-process-name
+				   sdcv-process-buffer-name
+				   "sdcv"))
+      ;; kill the initial prompt
+      (with-current-buffer (process-buffer process)
+	(while (not (string-equal "Enter word or phrase: "
+				  (sdcv-buffer-tail 22)))
+	  (sleep-for 0.01))
+	(erase-buffer)))
+    process))
+
+(defun sdcv-buffer-tail (length)
+  "Get a substring of length LENGTH at the end of
+current buffer."
+  (let ((beg (- (point-max) length))
+	(end (point-max)))
+    (if (< beg (point-min))
+	(setq beg (point-min)))
+    (buffer-substring-no-properties beg end)))
+    
+				     
+
 
 ;;;;##################################################################
 ;;;;  User Options, Variables
