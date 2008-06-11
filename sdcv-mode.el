@@ -71,12 +71,10 @@ The result will be displayed in buffer named with
 (defun sdcv-generate-dictionary-argument ()
   "Generate dictionary argument for sdcv from `sdcv-dictionary-list'."
   (if (null sdcv-dictionary-list)
-      ""
-    (mapconcat (lambda (dict)
-                 (concat "-u "
-                         (shell-quote-argument dict)))
-               sdcv-dictionary-list
-               " ")))
+      '()
+    (mapcan (lambda (dict)
+	      (list "-u" dict))
+	    sdcv-dictionary-list)))
 
 ;;; ==================================================================
 ;;; utilities to switch from and to sdcv buffer
@@ -235,9 +233,11 @@ the beginning of the buffer."
   "Get or create the sdcv process."
   (let ((process (get-process sdcv-process-name)))
     (when (null process)
-      (setq process (start-process sdcv-process-name
-				   sdcv-process-buffer-name
-				   "sdcv"))
+      (setq process (apply 'start-process
+			   sdcv-process-name
+			   sdcv-process-buffer-name
+			   "sdcv"
+			   (sdcv-generate-dictionary-argument)))
       ;; kill the initial prompt
       (with-current-buffer (process-buffer process)
 	(while (not (string-equal "Enter word or phrase: "
