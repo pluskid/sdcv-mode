@@ -1,9 +1,9 @@
 ;;; sdcv-mode.el --- major mode to do dictionary query through sdcv
 
-;; Copyright 2006 pluskid
+;; Copyright 2006~2008 pluskid
 ;;
 ;; Author: pluskid@gmail.com
-;; Version: $Id: sdcv-mode.el,v 0.0 2006/12/21 11:20:51 kid Exp $
+;; Version: $Id: sdcv-mode.el,v 0.1 2008/06/11 21:48:51 kid Exp $
 ;; Keywords: sdcv dictionary
 ;; X-URL: not distributed yet
 
