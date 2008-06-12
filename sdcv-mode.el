@@ -67,7 +67,9 @@ The result will be displayed in buffer named with
     (erase-buffer)
     (insert (sdcv-do-lookup word)))
   (sdcv-goto-sdcv)
+  (sdcv-mode)
   (sdcv-mode-reinit))
+
 (defun sdcv-generate-dictionary-argument ()
   "Generate dictionary argument for sdcv from `sdcv-dictionary-list'."
   (if (null sdcv-dictionary-list)
