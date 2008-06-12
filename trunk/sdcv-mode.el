@@ -208,8 +208,9 @@ the beginning of the buffer."
   (let ((process (sdcv-get-process)))
     (process-send-string process (concat word "\n"))
     (with-current-buffer (process-buffer process)
-      (let (rlt done)
-	(while (not done)
+      (let ((i 0) rlt done)
+	(while (and (not done)
+		    (< i sdcv-wait-timeout))
 	  (when (string-equal "Enter word or phrase: "
 			      (sdcv-buffer-tail 22))
 	    (setq rlt (buffer-substring-no-properties (point-min)
@@ -217,14 +218,25 @@ the beginning of the buffer."
 	    (setq done t))
 	  (when (string-equal "Your choice[-1 to abort]: "
 			      (sdcv-buffer-tail 26))
-	    (message "bingo")
 	    (delete-region (- (point-max) 26)
 			   (point-max))
 	    (process-send-string process "-1\n"))
 	  (unless done
-	    (sleep-for 0.01)))
+	    (sleep-for sdcv-wait-interval)
+	    (setq i (+ i sdcv-wait-interval))))
+	(unless (< i sdcv-wait-timeout)
+	  ;; timeout
+	  (kill-process process)
+	  (error "ERROR: timeout waiting for sdcv"))
 	(erase-buffer)
 	rlt))))
+
+(defvar sdcv-wait-timeout 2
+  "The max time (in seconds) to wait for the sdcv process to
+produce some output.")
+(defvar sdcv-wait-interval 0.01
+  "The interval (in seconds) to sleep each time to wait for
+sdcv's output.")
 
 (defconst sdcv-process-name "%sdcv-mode-process%")
 (defconst sdcv-process-buffer-name "*sdcv-mode-process*")
@@ -233,17 +245,27 @@ the beginning of the buffer."
   "Get or create the sdcv process."
   (let ((process (get-process sdcv-process-name)))
     (when (null process)
-      (setq process (apply 'start-process
-			   sdcv-process-name
-			   sdcv-process-buffer-name
-			   "sdcv"
-			   (sdcv-generate-dictionary-argument)))
-      ;; kill the initial prompt
-      (with-current-buffer (process-buffer process)
-	(while (not (string-equal "Enter word or phrase: "
-				  (sdcv-buffer-tail 22)))
-	  (sleep-for 0.01))
-	(erase-buffer)))
+      (with-current-buffer (get-buffer-create
+			    sdcv-process-buffer-name)
+	(erase-buffer)
+	(setq process (apply 'start-process
+			     sdcv-process-name
+			     sdcv-process-buffer-name
+			     "sdcv"
+			     (sdcv-generate-dictionary-argument)))
+	;; kill the initial prompt
+	(let ((i 0))
+	  (message "starting sdcv...")
+	  (while (and (not (string-equal "Enter word or phrase: "
+					 (sdcv-buffer-tail 22)))
+		      (< i sdcv-wait-timeout))
+	    (sleep-for sdcv-wait-interval)
+	    (setq i (+ i sdcv-wait-interval)))
+	  (unless (< i sdcv-wait-timeout)
+	    ;; timeout
+	    (kill-process process)
+	    (error "ERROR: timeout waiting for sdcv."))
+	  (erase-buffer))))
     process))
 
 (defun sdcv-buffer-tail (length)
