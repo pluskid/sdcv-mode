@@ -211,13 +211,11 @@ the beginning of the buffer."
       (let ((i 0) rlt done)
 	(while (and (not done)
 		    (< i sdcv-wait-timeout))
-	  (when (string-equal "Enter word or phrase: "
-			      (sdcv-buffer-tail 22))
+	  (when (sdcv-match-tail sdcv-word-prompts)
 	    (setq rlt (buffer-substring-no-properties (point-min)
 						      (- (point-max) 22)))
 	    (setq done t))
-	  (when (string-equal "Your choice[-1 to abort]: "
-			      (sdcv-buffer-tail 26))
+	  (when (sdcv-match-tail sdcv-choice-prompts)
 	    (delete-region (- (point-max) 26)
 			   (point-max))
 	    (process-send-string process "-1\n"))
@@ -241,6 +239,17 @@ sdcv's output.")
 (defconst sdcv-process-name "%sdcv-mode-process%")
 (defconst sdcv-process-buffer-name "*sdcv-mode-process*")
 
+(defvar sdcv-word-prompts '("Enter word or phrase: "
+			    "请输入单词或短语："
+			    "請輸入單字或片語：")
+  "A list of prompts that sdcv use to prompt for word.")
+
+(defvar sdcv-choice-prompts '("Your choice[-1 to abort]: "
+			      "您的选择为："
+			      "您的選擇為：")
+  "A list of prompts that sdcv use to prompt for a choice
+of multiple candicates.")
+
 (defun sdcv-get-process ()
   "Get or create the sdcv process."
   (let ((process (get-process sdcv-process-name)))
@@ -256,8 +265,7 @@ sdcv's output.")
 	;; kill the initial prompt
 	(let ((i 0))
 	  (message "starting sdcv...")
-	  (while (and (not (string-equal "Enter word or phrase: "
-					 (sdcv-buffer-tail 22)))
+	  (while (and (not (sdcv-match-tail sdcv-word-prompts))
 		      (< i sdcv-wait-timeout))
 	    (sleep-for sdcv-wait-interval)
 	    (setq i (+ i sdcv-wait-interval)))
@@ -276,14 +284,23 @@ current buffer."
     (if (< beg (point-min))
 	(setq beg (point-min)))
     (buffer-substring-no-properties beg end)))
-    
-				     
+
+(defun sdcv-match-tail (prompts)
+  (let ((done nil)
+	(prompt nil))
+    (while (and (not done)
+		prompts)
+      (setq prompt (car prompts))
+      (setq prompts (cdr prompts))
+      (if (string-equal prompt
+			(sdcv-buffer-tail (length prompt)))
+	  (setq done t)))
+    done))
 
 
 ;;;;##################################################################
 ;;;;  User Options, Variables
 ;;;;##################################################################
-
 
 (defvar sdcv-buffer-name "*sdcv*"
   "The name of the buffer of sdcv.")
