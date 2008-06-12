@@ -264,7 +264,7 @@ sdcv's output.")
 	  (unless (< i sdcv-wait-timeout)
 	    ;; timeout
 	    (kill-process process)
-	    (error "ERROR: timeout waiting for sdcv."))
+	    (error "ERROR: timeout waiting for sdcv"))
 	  (erase-buffer))))
     process))
 
