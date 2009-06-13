@@ -39,23 +39,37 @@
 
 ;;; ==================================================================
 ;;; Frontend, search word and display sdcv buffer
-(defun sdcv-search (force-all-dictionaries)
+(defun sdcv-search (select-dictionary-list)
   "Prompt for a word to search through sdcv.
-When provided with a prefix argument, use all the dictionaries
-no matter what `sdcv-dictionary-list' is."
+When provided with a prefix argument, select new
+`sdcv-dictionary-list' before search.
+
+Word may contain some special characters:
+    *       match zero or more characters
+    ?       match zero or one character
+    /       used at the beginning, for fuzzy search
+    |       used at the beginning, for data search
+    \       escape the character right after"
   (interactive "P")
+  (when select-dictionary-list
+    (if (not sdcv-dictionary-alist)
+        (error "ERROR: no `sdcv-dictionary-alist' defined.")
+      ;; select sdcv-dictionary-list
+      (setq sdcv-dictionary-list
+            (cdr (assoc
+                  (completing-read "Select dictionary list: "
+                                   sdcv-dictionary-alist nil t)
+                  sdcv-dictionary-alist)))
+      ;; kill sdcv process
+      (and (get-process sdcv-process-name)
+           (kill-process (get-process sdcv-process-name)))))
   (let ((word (if (and transient-mark-mode mark-active)
                   (buffer-substring-no-properties (region-beginning)
                                                   (region-end))
-                (sdcv-current-word)))
-        ;; note that elisp is dynamic-scoped
-        (sdcv-dictionary-list (if force-all-dictionaries
-                                  nil
-                                sdcv-dictionary-list)))
+                (sdcv-current-word))))
     (setq word (read-string
-                (format "Search the dictionary for (default %s): "
-                        word)
-                nil nil word))
+                "Search the dictionary for: "
+                word nil word))
     (sdcv-search-word word)))
 
 (defun sdcv-search-word (word)
@@ -70,13 +84,24 @@ The result will be displayed in buffer named with
   (sdcv-mode)
   (sdcv-mode-reinit))
 
+(defun sdcv-list-dictionary ()
+  "Show available dictionaries."
+  (interactive)
+  (let (resize-mini-windows)
+    (shell-command "sdcv -l" sdcv-buffer-name)))
+
 (defun sdcv-generate-dictionary-argument ()
-  "Generate dictionary argument for sdcv from `sdcv-dictionary-list'."
-  (if (null sdcv-dictionary-list)
-      '()
-    (mapcan (lambda (dict)
-	      (list "-u" dict))
-	    sdcv-dictionary-list)))
+  "Generate dictionary argument for sdcv from `sdcv-dictionary-list'
+and `sdcv-dictionary-path'."
+  (append
+   (if (null sdcv-dictionary-path)
+       '()
+     (list "--data-dir" sdcv-dictionary-path))
+   (if (null sdcv-dictionary-list)
+       '()
+     (mapcan (lambda (dict)
+               (list "-u" dict))
+             sdcv-dictionary-list))))
 
 ;;; ==================================================================
 ;;; utilities to switch from and to sdcv buffer
@@ -145,22 +170,17 @@ The result will be displayed in buffer named with
     (define-key map "r" 'isearch-backward-regexp)
     (define-key map (kbd "C-s") 'isearch-forward)
     (define-key map (kbd "C-r") 'isearch-backward)
-    (define-key map (kbd "RET") 'sdcv-mode-scroll-up-one-line)
-    (define-key map (kbd "M-RET") 'sdcv-mode-scroll-down-one-line)
     (define-key map "v" 'scroll-up)
     (define-key map (kbd "M-v") 'scroll-down)
     (define-key map " " 'scroll-up)
     (define-key map (kbd "DEL") 'scroll-down)
-    (define-key map (kbd "C-n") 'sdcv-mode-next-line)
-    (define-key map "n" 'sdcv-mode-next-line)
-    (define-key map (kbd "C-p") 'sdcv-mode-previous-line)
-    (define-key map "p" 'sdcv-mode-previous-line)
     (define-key map "d" 'sdcv-search)
     (define-key map "?" 'describe-mode)
-    (define-key map "a" 'show-all)
-    (define-key map "h" 'hide-body)
-    (define-key map "e" 'show-entry)
-    (define-key map "c" 'hide-entry)
+    (define-key map "\t" 'outline-toggle-children)
+    (define-key map "\r" 'outline-toggle-children)
+    (define-key map "n" 'outline-next-visible-heading)
+    (define-key map "p" 'outline-previous-visible-heading)
+    (define-key map "a" 'sdcv-show-or-hide-all)
     map)
   "Keymap for `sdcv-mode'.")
 
@@ -170,17 +190,34 @@ The result will be displayed in buffer named with
 Turning on Text mode runs the normal hook `sdcv-mode-hook'."
   (setq font-lock-defaults '(sdcv-mode-font-lock-keywords))
   (setq buffer-read-only t)
-  (set (make-local-variable 'outline-regexp) "^-->.*\n-->"))
+  (set (make-local-variable 'outline-regexp) "^-->"))
 
 (defun sdcv-mode-reinit ()
   "Re-initialize buffer.
 Hide all entrys but the first one and goto
 the beginning of the buffer."
+  (setq buffer-read-only nil)
+  ;; replace "-->...\n-->" to "-->...: "
+  (goto-char (point-min))
+  (while (re-search-forward "-->\\(.*\\)\\(\n-->\\)" nil t)
+    (replace-match "-->\\1: " t))
+
+  ;; hilight word
+  (hi-lock-mode 0)
+  (let ((pattern sdcv-result-patterns)
+        done)
+    (while (and pattern (not done))
+      (goto-char (point-min))
+      (when (re-search-forward (car pattern) nil t)
+        (highlight-regexp (match-string 1) 'font-lock-keyword-face)
+        (setq done t))
+      (setq pattern (cdr pattern))))
+
   (ignore-errors
     (setq buffer-read-only t)
     (hide-body)
     (goto-char (point-min))
-    (next-line 1)
+    (forward-line)
     (show-entry)))
 
 (defun sdcv-mode-scroll-up-one-line ()
@@ -192,7 +229,7 @@ the beginning of the buffer."
 (defun sdcv-mode-next-line ()
   (interactive)
   (ignore-errors
-    (next-line 1)
+    (forward-line)
     (save-excursion
       (beginning-of-line nil)
       (when (looking-at outline-regexp)
@@ -202,6 +239,19 @@ the beginning of the buffer."
 ;; is only an alias of `previous-line'.
 (defalias 'sdcv-mode-previous-line 'previous-line)
 
+(defun sdcv-show-or-hide-all ()
+  "Show or hide all body lines in buffer."
+  (interactive)
+  (let ((beg (point-min))
+        (end (point-max)))
+  (overlay-recenter end)
+  (save-excursion
+    (catch 'exit
+      (dolist (o (overlays-in beg end))
+        (when (eq (overlay-get o 'invisible) 'outline)
+          (show-all)
+          (throw 'exit nil)))
+      (hide-body)))))
 
 ;;; ==================================================================
 ;;; Support for sdcv process in background
@@ -215,11 +265,9 @@ the beginning of the buffer."
 		    (< i sdcv-wait-timeout))
 	  (when (sdcv-match-tail sdcv-word-prompts)
 	    (setq rlt (buffer-substring-no-properties (point-min)
-						      (- (point-max) 22)))
+						      (point-max)))
 	    (setq done t))
 	  (when (sdcv-match-tail sdcv-choice-prompts)
-	    (delete-region (- (point-max) 26)
-			   (point-max))
 	    (process-send-string process "-1\n"))
 	  (unless done
 	    (sleep-for sdcv-wait-interval)
@@ -252,6 +300,12 @@ sdcv's output.")
   "A list of prompts that sdcv use to prompt for a choice
 of multiple candicates.")
 
+(defvar sdcv-result-patterns '("^Found [0-9]+ items, similar to [*?/|]*\\(.+?\\)[*?]*\\."
+			      "^发现 [0-9]+ 条记录和 [*?/|]*\\(.+?\\)[*?]* 相似。"
+			      )
+  "A list of patterns to extract result word of sdcv. Special
+characters are stripped.")
+
 (defun sdcv-get-process ()
   "Get or create the sdcv process."
   (let ((process (get-process sdcv-process-name)))
@@ -262,7 +316,7 @@ of multiple candicates.")
 	(setq process (apply 'start-process
 			     sdcv-process-name
 			     sdcv-process-buffer-name
-			     "sdcv"
+			     sdcv-program-path
 			     (sdcv-generate-dictionary-argument)))
 	;; kill the initial prompt
 	(let ((i 0))
@@ -294,9 +348,11 @@ current buffer."
 		prompts)
       (setq prompt (car prompts))
       (setq prompts (cdr prompts))
-      (if (string-equal prompt
-			(sdcv-buffer-tail (length prompt)))
-	  (setq done t)))
+      (when (string-equal prompt
+                          (sdcv-buffer-tail (length prompt)))
+        (delete-region (- (point-max) (length prompt))
+                       (point-max))
+        (setq done t)))
     done))
 
 
@@ -311,5 +367,16 @@ current buffer."
 Each entry is a string denoting the name of a dictionary, which
 is then passed to sdcv through the '-u' command line option. If
 this list is nil then all the dictionaries will be used.")
+(defvar sdcv-dictionary-alist nil
+  "An alist of dictionaries, used to interactively form
+ sdcv-dictionary-list. It has the form:
+   ((\"group1\" \"dict1\" \"dict2\" ...)
+    (\"group2\" \"dict2\" \"dict3\"))
+")
 
+(defvar sdcv-program-path "sdcv"
+  "The path of sdcv program.")
+
+(defvar sdcv-dictionary-path nil
+  "The path of dictionaries.")
 ;;; sdcv-mode.el ends here
