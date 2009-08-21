@@ -68,8 +68,8 @@ Word may contain some special characters:
                                                   (region-end))
                 (sdcv-current-word))))
     (setq word (read-string
-                "Search the dictionary for: "
-                word nil word))
+                (format "Search the dictionary for (default %s): " word)
+                nil nil word))
     (sdcv-search-word word)))
 
 (defun sdcv-search-word (word)
@@ -170,17 +170,22 @@ and `sdcv-dictionary-path'."
     (define-key map "r" 'isearch-backward-regexp)
     (define-key map (kbd "C-s") 'isearch-forward)
     (define-key map (kbd "C-r") 'isearch-backward)
+    (define-key map (kbd "RET") 'sdcv-mode-scroll-up-one-line)
+    (define-key map (kbd "M-RET") 'sdcv-mode-scroll-down-one-line)
     (define-key map "v" 'scroll-up)
     (define-key map (kbd "M-v") 'scroll-down)
     (define-key map " " 'scroll-up)
     (define-key map (kbd "DEL") 'scroll-down)
+    (define-key map (kbd "C-n") 'sdcv-mode-next-line)
+    (define-key map "n" 'sdcv-mode-next-line)
+    (define-key map (kbd "C-p") 'sdcv-mode-previous-line)
+    (define-key map "p" 'sdcv-mode-previous-line)
     (define-key map "d" 'sdcv-search)
     (define-key map "?" 'describe-mode)
-    (define-key map "\t" 'outline-toggle-children)
-    (define-key map "\r" 'outline-toggle-children)
-    (define-key map "n" 'outline-next-visible-heading)
-    (define-key map "p" 'outline-previous-visible-heading)
-    (define-key map "a" 'sdcv-show-or-hide-all)
+    (define-key map "a" 'show-all)
+    (define-key map "h" 'hide-body)
+    (define-key map "e" 'show-entry)
+    (define-key map "c" 'hide-entry)
     map)
   "Keymap for `sdcv-mode'.")
 
@@ -190,34 +195,34 @@ and `sdcv-dictionary-path'."
 Turning on Text mode runs the normal hook `sdcv-mode-hook'."
   (setq font-lock-defaults '(sdcv-mode-font-lock-keywords))
   (setq buffer-read-only t)
-  (set (make-local-variable 'outline-regexp) "^-->"))
+  (set (make-local-variable 'outline-regexp) "^-->.*\n-->"))
 
 (defun sdcv-mode-reinit ()
   "Re-initialize buffer.
 Hide all entrys but the first one and goto
 the beginning of the buffer."
   (setq buffer-read-only nil)
-  ;; replace "-->...\n-->" to "-->...: "
-  (goto-char (point-min))
-  (while (re-search-forward "-->\\(.*\\)\\(\n-->\\)" nil t)
-    (replace-match "-->\\1: " t))
+  ;; ;; replace "-->...\n-->" to "-->...: "
+  ;; (goto-char (point-min))
+  ;; (while (re-search-forward "-->\\(.*\\)\\(\n-->\\)" nil t)
+  ;;   (replace-match "-->\\1: " t))
 
-  ;; hilight word
-  (hi-lock-mode 0)
-  (let ((pattern sdcv-result-patterns)
-        done)
-    (while (and pattern (not done))
-      (goto-char (point-min))
-      (when (re-search-forward (car pattern) nil t)
-        (highlight-regexp (match-string 1) 'font-lock-keyword-face)
-        (setq done t))
-      (setq pattern (cdr pattern))))
+  ;; ;; hilight word
+  ;; (hi-lock-mode 0)
+  ;; (let ((pattern sdcv-result-patterns)
+  ;;       done)
+  ;;   (while (and pattern (not done))
+  ;;     (goto-char (point-min))
+  ;;     (when (re-search-forward (car pattern) nil t)
+  ;;       (highlight-regexp (match-string 1) 'font-lock-keyword-face)
+  ;;       (setq done t))
+  ;;     (setq pattern (cdr pattern))))
 
   (ignore-errors
     (setq buffer-read-only t)
     (hide-body)
     (goto-char (point-min))
-    (forward-line)
+    (next-line 1)
     (show-entry)))
 
 (defun sdcv-mode-scroll-up-one-line ()
@@ -229,7 +234,7 @@ the beginning of the buffer."
 (defun sdcv-mode-next-line ()
   (interactive)
   (ignore-errors
-    (forward-line)
+    (next-line 1)
     (save-excursion
       (beginning-of-line nil)
       (when (looking-at outline-regexp)
@@ -238,20 +243,6 @@ the beginning of the buffer."
 ;; doing previous-line. So `sdcv-mode-previous-line'
 ;; is only an alias of `previous-line'.
 (defalias 'sdcv-mode-previous-line 'previous-line)
-
-(defun sdcv-show-or-hide-all ()
-  "Show or hide all body lines in buffer."
-  (interactive)
-  (let ((beg (point-min))
-        (end (point-max)))
-  (overlay-recenter end)
-  (save-excursion
-    (catch 'exit
-      (dolist (o (overlays-in beg end))
-        (when (eq (overlay-get o 'invisible) 'outline)
-          (show-all)
-          (throw 'exit nil)))
-      (hide-body)))))
 
 ;;; ==================================================================
 ;;; Support for sdcv process in background
